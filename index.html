@@ -90,9 +90,13 @@ scene.background = new THREE.Color(0x15151a);
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 200); camera.position.set(hx-3.5, 1.7, hz-1.0);
   
 
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
 document.getElementById('app').appendChild(renderer.domElement);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -104,15 +108,15 @@ controls.minDistance = 3;
 controls.maxDistance = 30;
 controls.update();
 
-scene.add(new THREE.HemisphereLight(0xfff3dd, 0x3a3226, 0.9));
+scene.add(new THREE.HemisphereLight(0xfff3dd, 0x3a3226, 1.05));
 const dir = new THREE.DirectionalLight(0xfff3dd, 0.7);
 dir.position.set(8, 12, 6);
 dir.castShadow = true;
 scene.add(dir);
 
-function box(sx, sy, sz, cx, cy, cz, color, parent) {
+function box(sx, sy, sz, cx, cy, cz, color, parent, material) {
   const geo = new THREE.BoxGeometry(sx, sy, sz);
-  const mat = new THREE.MeshStandardMaterial({color, roughness:0.9});
+  const mat = material || new THREE.MeshStandardMaterial({color, roughness:0.86});
   const m = new THREE.Mesh(geo, mat);
   m.position.set(cx, cy, cz);
   m.receiveShadow = true; m.castShadow = true;
@@ -120,14 +124,25 @@ function box(sx, sy, sz, cx, cy, cz, color, parent) {
   return m;
 }
 
-box(ROOM_L, 0.05, ROOM_W, 0, -0.025, 0, COL.carpet);
+function proceduralTexture(draw, size=512, repeatX=1, repeatY=1){
+  const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); draw(x,size);
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(repeatX,repeatY); t.encoding=THREE.sRGBEncoding; return t;
+}
+const carpetMap=proceduralTexture((x,s)=>{x.fillStyle='#a57a34';x.fillRect(0,0,s,s);for(let i=0;i<15000;i++){const a=Math.random()*0.18+0.04;x.fillStyle=`rgba(${70+Math.random()*60},${45+Math.random()*35},${18},${a})`;x.fillRect(Math.random()*s,Math.random()*s,1+Math.random()*2,1+Math.random()*2)} for(let y=0;y<s;y+=16){x.fillStyle='rgba(255,220,140,.06)';x.fillRect(0,y,s,1)}},512,10,5);
+const carpetMat=new THREE.MeshStandardMaterial({map:carpetMap,color:0xd0a657,roughness:1});
+const wallMap=proceduralTexture((x,s)=>{x.fillStyle='#735541';x.fillRect(0,0,s,s);for(let i=0;i<28000;i++){x.fillStyle=`rgba(255,240,220,${Math.random()*.06})`;x.fillRect(Math.random()*s,Math.random()*s,1,1)}},512,5,2);
+const wallMat=new THREE.MeshStandardMaterial({map:wallMap,color:0xb79578,roughness:.93});
+const whiteMat=new THREE.MeshStandardMaterial({color:0xf6f3ec,roughness:.8});
+const metalMat=new THREE.MeshStandardMaterial({color:0x9b9290,roughness:.28,metalness:.72});
+
+box(ROOM_L, 0.05, ROOM_W, 0, -0.025, 0, COL.carpet, null, carpetMat);
 
 function wall(length, cx, cz, axisX) {
   const sx = axisX ? length : 0.12, sz = axisX ? 0.12 : length;
   const trimY = 1.95, upH = WALL_H - trimY;
-  box(sx, trimY, sz, cx, trimY/2, cz, COL.wallLow);
+  box(sx, trimY, sz, cx, trimY/2, cz, COL.wallLow, null, wallMat);
   box(sx+0.02, 0.10, sz+0.02, cx, trimY, cz, COL.trim);
-  box(sx, upH, sz, cx, trimY+upH/2, cz, COL.wallUp);
+  box(sx, upH, sz, cx, trimY+upH/2, cz, COL.wallUp, null, wallMat);
   box(sx+0.02, 0.14, sz+0.03, cx, 0.07, cz, COL.base);
 }
 wall(ROOM_L, 0, -hz, true);
@@ -152,6 +167,15 @@ coveBar(innerL, 0.16, 0.10, 0, coveY,  innerW/2);
 coveBar(0.10, 0.16, innerW, -innerL/2, coveY, 0);
 coveBar(0.10, 0.16, innerW,  innerL/2, coveY, 0);
 
+// Acoustic ceiling tiles, fluorescent panels, recessed cans, and the long HVAC soffit.
+const tileMat=new THREE.MeshStandardMaterial({color:0xd6cab9,roughness:.95});
+for(let x=-7.5;x<=7.5;x+=1.5) for(let z=-3.25;z<=3.25;z+=1.25) box(1.46,.025,1.21,x,TRAY_H-.04,z,0,null,tileMat);
+const lightMat=new THREE.MeshStandardMaterial({color:0xfff8e8,emissive:0xfff1c9,emissiveIntensity:.75,roughness:.55});
+for(let x=-6.6;x<=6.6;x+=3.3) for(let z=-2.45;z<=2.45;z+=2.45) box(1.18,.035,.55,x,TRAY_H-.07,z,0,null,lightMat);
+for(let x=-7.4;x<=7.4;x+=1.85){ const lamp=new THREE.PointLight(0xffe4b3,.24,5); lamp.position.set(x,2.83,-hz+.62); scene.add(lamp); }
+box(ROOM_L-.6,.15,.34,0,TRAY_H-.22,-.15,0x786f62);
+for(let x=-7.5;x<=7.5;x+=.16) box(.08,.012,.23,x,TRAY_H-.31,-.15,0x24211e);
+
 [-5.6, 0.4, 6.0].forEach(cx => {
   box(0.75, WALL_H, 0.55, cx, WALL_H/2, -hz+0.30, COL.column);
 });
@@ -163,6 +187,8 @@ function doubleDoor(cx){
   box(1.02, 2.15, 0.08, cx+0.53, 1.075, z+0.06, COL.door);
 }
 [-2.6, 3.2, 7.9].forEach(doubleDoor);
+function sideDoor(cx, cz, rot=0){ const g=new THREE.Group(); const frame=box(1.35,2.35,.13,0,1.175,0,COL.doorFrame,g); const door=box(1.13,2.14,.08,0,1.07,.04,COL.door,g); box(1.02,.06,.055,0,1.12,.095,0x544b42,g); box(.08,.09,.05,.38,1.12,.13,0xd3a328,g); const sign=box(.54,.18,.06,0,2.48,.04,0xc7352d,g); sign.material.emissive=new THREE.Color(0x8c1e1e); sign.material.emissiveIntensity=.7; g.position.set(cx,0,cz); g.rotation.y=rot; scene.add(g); }
+sideDoor(-hx+.08,-2.7,Math.PI/2); sideDoor(-hx+.08,2.8,Math.PI/2); sideDoor(hx-.08,-1.7,-Math.PI/2); sideDoor(hx-.08,2.6,-Math.PI/2);
 
 box(4.60, 0.90, 0.55, 4.0, 0.45, hz-0.30, COL.credenza);
 box(0.08, 0.22, 3.30, -hx+0.14, 2.62, 0, COL.screenHousing);
@@ -192,6 +218,25 @@ function makeLabelSprite(text, bg){
   return spr;
 }
 
+function addBalloon(parent, x,y,z,r,color){
+  const b=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),new THREE.MeshStandardMaterial({color,roughness:.3,metalness:color===0xc9c9c9?.55:0}));
+  b.scale.set(.92,1.08,.92); b.position.set(x,y,z); b.castShadow=true; parent.add(b); return b;
+}
+function addBanquetChair(parent,x,z,a=0){
+  const g=new THREE.Group();
+  const upholstery=new THREE.MeshStandardMaterial({color:0x141822,roughness:.8});
+  const frameMat=new THREE.MeshStandardMaterial({color:0x111218,metalness:.64,roughness:.3});
+  const seat=new THREE.Mesh(new THREE.BoxGeometry(.46,.09,.46),upholstery); seat.position.y=.48; g.add(seat);
+  const back=new THREE.Mesh(new THREE.BoxGeometry(.43,.52,.075),upholstery); back.position.set(0,.79,.16); back.rotation.x=-.12; g.add(back);
+  for(const [lx,lz] of [[-.18,-.18],[.18,-.18],[-.18,.18],[.18,.18]]){ const leg=new THREE.Mesh(new THREE.CylinderGeometry(.022,.018,.5,7),frameMat); leg.position.set(lx,.25,lz); g.add(leg); }
+  g.position.set(x,0,z);g.rotation.y=a; parent.add(g);
+}
+function addClothTable(parent, radius=.75){
+  const cloth=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius*.9,.71,48,1,true),new THREE.MeshStandardMaterial({color:0xf8f5f0,roughness:.92,side:THREE.DoubleSide})); cloth.position.y=.37; cloth.castShadow=true; parent.add(cloth);
+  const top=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,.055,48),whiteMat); top.position.y=.75;top.castShadow=true;parent.add(top);
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(.12,.23,.72,20),metalMat);stem.position.y=.36;parent.add(stem);
+}
+
 let furniture = [];
 const furnById = new Map();
 let selected = null;
@@ -206,73 +251,54 @@ function buildFurniture(type, data){
     g.userData.themeIdx = data.themeIdx || 0;
     const theme = themes[g.userData.themeIdx % themes.length];
 
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.75,0.75,0.05,32),
-      new THREE.MeshStandardMaterial({color:0xf2f0ea}));
-    top.position.y = 0.75; top.castShadow = true; g.add(top);
-    const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.75,0.62,0.72,32,1,true),
-      new THREE.MeshStandardMaterial({color:0xf8f7f3, side:THREE.DoubleSide}));
-    cloth.position.y = 0.39; g.add(cloth);
+    addClothTable(g);
 
     for(let i=0;i<8;i++){
       const a = (i/8)*Math.PI*2;
       const cx = Math.cos(a)*1.05, cz = Math.sin(a)*1.05;
-      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.06,0.42),
-        new THREE.MeshStandardMaterial({color:COL.chair}));
-      seat.position.set(cx, 0.46, cz); g.add(seat);
-      const back = new THREE.Mesh(new THREE.BoxGeometry(0.40,0.42,0.05),
-        new THREE.MeshStandardMaterial({color:COL.chair}));
-      back.position.set(cx*1.18, 0.68, cz*1.18);
-      back.lookAt(0, 0.68, 0); g.add(back);
+      addBanquetChair(g,cx,cz,a+Math.PI);
     }
 
+    for(let i=0;i<5;i++) addBalloon(g,Math.cos(i*1.26)*.2, .91+((i%2)*.12), Math.sin(i*1.26)*.2,.11,[0xd85a8e,0x7141a2,0x1d1b26,0xc9c9c9,theme.color][i]);
     const label = makeLabelSprite(theme.name, theme.color);
-    label.position.set(0, 1.35, 0);
+    label.position.set(0, 1.45, 0);
     g.add(label);
     g.userData.label = label;
 
   } else if(type === 'stage'){
     g.userData.half = 1.4; g.userData.h = 0;
-    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.06,1.6,2.6),
-      new THREE.MeshStandardMaterial({color:0xf8f8f6}));
-    screen.position.set(0, 1.1, 0); screen.rotation.y = Math.PI/2; g.add(screen);
-    const podium = new THREE.Mesh(new THREE.BoxGeometry(0.5,1.0,0.4),
-      new THREE.MeshStandardMaterial({color:0x555049}));
-    podium.position.set(1.0, 0.5, 1.2); g.add(podium);
-    [ -1.3, 1.5 ].forEach(zz => {
-      for(let i=0;i<3;i++){
-        const s = new THREE.Mesh(new THREE.SphereGeometry(0.16,12,12),
-          new THREE.MeshStandardMaterial({color:[0xd4537e,0x7f77dd,0xc9c9c9][i%3]}));
-        s.position.set(0.9, 0.3+i*0.32, zz + (i%2?0.15:-0.15));
-        g.add(s);
-      }
-    });
+    const deck=box(2.7,.24,3.7,0,.12,0,0x32233b,g);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(.08,1.72,2.72),whiteMat);screen.position.set(0,1.2,0);screen.rotation.y=Math.PI/2;screen.castShadow=true;g.add(screen);
+    const frame=box(.13,1.9,2.92,0,1.22,0,0x15131b,g); frame.rotation.y=Math.PI/2;
+    const podium=box(.58,1.03,.46,.82,.52,1.2,0x514a52,g); box(.62,.07,.5,.82,1.05,1.2,0xd6abc4,g);
+    const mic=new THREE.Mesh(new THREE.CylinderGeometry(.014,.014,.5,8),metalMat);mic.position.set(.82,1.4,1.2);mic.rotation.z=.42;g.add(mic);
+    [-1.35,1.35].forEach((zz)=>{for(let i=0;i<9;i++) addBalloon(g,.78+(i%3)*.1,.2+Math.floor(i/3)*.34,zz+(i%2?.13:-.1),.17,[0xd85a8e,0x7141a2,0x1c1821,0xc9c9c9][i%4]);});
     const label = makeLabelSprite('Stage', 0x534ab7);
     label.position.set(0.5, 2.3, 0); g.add(label);
 
   } else if(type === 'buffet'){
     g.userData.half = 1.3; g.userData.h = 0;
-    const table = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.78,0.75),
-      new THREE.MeshStandardMaterial({color:0xf5f3ee}));
-    table.position.y = 0.39; g.add(table);
+    const table = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.78,0.75),whiteMat); table.position.y = 0.39; table.castShadow=true; g.add(table);
+    const skirt=new THREE.Mesh(new THREE.BoxGeometry(2.68,.7,.08),whiteMat); skirt.position.set(0,.35,.39);g.add(skirt);
     for(let i=0;i<3;i++){
       const chafer = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.22,0.4),
         new THREE.MeshStandardMaterial({color:0xc9ccd0, metalness:0.6, roughness:0.3}));
       chafer.position.set(-0.9+i*0.9, 0.9, 0); g.add(chafer);
     }
+    for(let i=0;i<4;i++){const plate=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.025,20),whiteMat);plate.position.set(-.88+i*.58,.93,.15);g.add(plate);}
     const label = makeLabelSprite('Buffet', 0xba7517);
     label.position.set(0, 1.5, 0); g.add(label);
 
   } else if(type === 'booth'){
     g.userData.half = 1.1; g.userData.h = 0;
+    const carpet=new THREE.Mesh(new THREE.BoxGeometry(1.7,.035,2.5),new THREE.MeshStandardMaterial({color:0x4c1d7c,roughness:.75}));carpet.position.set(.65,.02,0);g.add(carpet);
     const backdrop = new THREE.Mesh(new THREE.BoxGeometry(0.08,2.2,2.2),
-      new THREE.MeshStandardMaterial({color:0xffffff}));
+      new THREE.MeshStandardMaterial({color:0xf5e9f0,roughness:.9}));
     backdrop.position.set(0, 1.1, 0); backdrop.rotation.y = Math.PI/2; g.add(backdrop);
-    const arch = new THREE.Mesh(new THREE.TorusGeometry(1.15,0.14,10,24,Math.PI),
-      new THREE.MeshStandardMaterial({color:0x7f77dd}));
-    arch.position.set(0.1, 0, 0); arch.rotation.z = Math.PI/2; arch.rotation.y = Math.PI/2; g.add(arch);
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.25,1.5,0.25),
-      new THREE.MeshStandardMaterial({color:0xf0f0f0}));
+    for(let i=0;i<26;i++){const a=Math.PI*(i/25);addBalloon(g,.11,1.1+Math.sin(a)*1.15,-Math.cos(a)*1.12,.13+(i%3)*.025,[0xd85a8e,0x7141a2,0x1c1821,0xc9c9c9][i%4]);}
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.25,1.5,0.25),whiteMat);
     post.position.set(1.0, 0.75, 0); g.add(post);
+    const cameraBody=new THREE.Mesh(new THREE.BoxGeometry(.25,.4,.16),new THREE.MeshStandardMaterial({color:0x11111a,metalness:.35,roughness:.32}));cameraBody.position.set(1,1.42,0);g.add(cameraBody);
     const label = makeLabelSprite('Photo booth', 0xa32d2d);
     label.position.set(0.5, 2.5, 0); g.add(label);
   }
@@ -502,4 +528,3 @@ animate();
 </script>
 </body>
 </html>
-est{"a":1}(b)[c]
