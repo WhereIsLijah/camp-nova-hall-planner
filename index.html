@@ -44,7 +44,7 @@
   <button id="del-sel" class="danger">Delete selected</button>
   <button id="reset">Reset furniture (everyone)</button>
   <div id="summary">0 round tables &middot; 0 seats</div>
-  <div id="hint">Drag empty floor to orbit &middot; drag a piece to move it &middot; scroll to zoom &middot; click a piece to select, click a table again to cycle its theme. Changes sync to everyone with this link, live.</div>
+  <div id="hint">You are inside the hall: drag to look around, use W/A/S/D or arrow keys to walk, and scroll to move closer or farther—without leaving the room. Drag furniture to move it; click a table again to cycle its theme. Changes sync live.</div>
 </div>
 <div id="tour" aria-label="Photo-based hall walkthrough">
   <div id="tour-head"><div><h2>Camp Nova Hall Walkthrough</h2><p><span id="tour-pill">PHOTO TOUR</span>Real hall frames · Drag, use arrow keys, or the timeline to move through the room.</p></div><button id="tour-close">Return to planner</button></div>
@@ -124,8 +124,21 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI/2 - 0.03;
 controls.minDistance = 3;
-controls.maxDistance = 30;
+controls.maxDistance = 16;
+controls.enablePan = false;
 controls.update();
+
+// Keep the camera physically inside the modeled hall. OrbitControls otherwise
+// allows a viewer to pull the virtual camera through walls, which breaks the room illusion.
+const cameraBounds = { minX:-hx + .42, maxX:hx - .42, minZ:-hz + .42, maxZ:hz - .42, minY:.85, maxY:2.72 };
+function confineCamera(){
+  camera.position.x = Math.max(cameraBounds.minX, Math.min(cameraBounds.maxX, camera.position.x));
+  camera.position.z = Math.max(cameraBounds.minZ, Math.min(cameraBounds.maxZ, camera.position.z));
+  camera.position.y = Math.max(cameraBounds.minY, Math.min(cameraBounds.maxY, camera.position.y));
+  controls.target.x = Math.max(-hx+.55, Math.min(hx-.55, controls.target.x));
+  controls.target.z = Math.max(-hz+.55, Math.min(hz-.55, controls.target.z));
+}
+controls.addEventListener('change', confineCamera);
 
 scene.add(new THREE.HemisphereLight(0xfff3dd, 0x3a3226, 1.05));
 const dir = new THREE.DirectionalLight(0xfff3dd, 0.7);
@@ -567,6 +580,23 @@ document.getElementById('tour-stage').addEventListener('pointerdown',e=>{tourDra
 window.addEventListener('pointermove',e=>{if(tourDragX===null)return; const steps=Math.trunc((tourDragX-e.clientX)/18);if(steps){changeTour(steps);tourDragX=e.clientX;}});
 window.addEventListener('pointerup',()=>{tourDragX=null;document.getElementById('tour-stage').classList.remove('dragging');});
 window.addEventListener('keydown',e=>{if(!tour.classList.contains('open'))return;if(e.key==='ArrowRight')changeTour(1);if(e.key==='ArrowLeft')changeTour(-1);if(e.key==='Escape')tour.classList.remove('open');});
+
+// Keyboard walking translates both camera and look target together, then uses
+// the same interior boundary as orbit/zoom. This is deliberately not a free camera.
+window.addEventListener('keydown', (e) => {
+  if(tour.classList.contains('open') || ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  const key=e.key.toLowerCase();
+  if(!['w','a','s','d','arrowup','arrowdown'].includes(key)) return;
+  e.preventDefault();
+  const forward=new THREE.Vector3().subVectors(controls.target,camera.position); forward.y=0; forward.normalize();
+  const right=new THREE.Vector3(-forward.z,0,forward.x); const step=.48;
+  const delta=new THREE.Vector3();
+  if(key==='w'||key==='arrowup') delta.addScaledVector(forward,step);
+  if(key==='s'||key==='arrowdown') delta.addScaledVector(forward,-step);
+  if(key==='a') delta.addScaledVector(right,-step);
+  if(key==='d') delta.addScaledVector(right,step);
+  camera.position.add(delta); controls.target.add(delta); confineCamera(); controls.update();
+});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth/window.innerHeight;
