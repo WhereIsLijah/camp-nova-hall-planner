@@ -17,6 +17,19 @@
   #status { position:absolute; top:14px; right:14px; z-index:10; font-size:12px; color:#ddd; background:rgba(20,20,24,0.85); border:1px solid #333; padding:8px 12px; border-radius:8px; display:flex; align-items:center; gap:7px; }
   #status .dot { width:8px; height:8px; border-radius:50%; background:#e0a83a; }
   #status.live .dot { background:#3adb76; }
+  #tour { position:fixed; inset:0; z-index:30; display:none; background:#09090c; color:#fff; }
+  #tour.open { display:grid; grid-template-rows:auto 1fr auto; }
+  #tour-head { display:flex; align-items:center; justify-content:space-between; padding:15px 20px; background:linear-gradient(180deg,rgba(10,10,14,.98),rgba(10,10,14,.72)); z-index:2; }
+  #tour-head h2 { font-size:15px; margin:0; letter-spacing:.02em; } #tour-head p { margin:3px 0 0; color:#a9a9b5; font-size:12px; }
+  #tour-close { color:#fff; background:#292937; border:1px solid #4c4c5d; border-radius:7px; padding:8px 12px; cursor:pointer; }
+  #tour-stage { position:relative; overflow:hidden; display:grid; place-items:center; min-height:0; cursor:grab; user-select:none; }
+  #tour-stage.dragging { cursor:grabbing; }
+  #tour-image { width:100%; height:100%; object-fit:contain; transition:opacity .16s ease; }
+  #tour-caption { position:absolute; left:18px; bottom:18px; padding:9px 12px; max-width:310px; background:rgba(10,10,14,.78); border:1px solid rgba(255,255,255,.16); border-radius:8px; font-size:12px; line-height:1.4; }
+  #tour-controls { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:14px; padding:13px 20px 16px; background:#111117; }
+  .tour-nav { border:1px solid #494957; background:#24242d; color:#fff; border-radius:7px; width:38px; height:34px; cursor:pointer; font-size:20px; }
+  #tour-range { width:100%; accent-color:#d968a6; } #tour-count { min-width:64px; color:#bebecb; font-size:12px; text-align:right; }
+  #tour-pill { display:inline-block; color:#f5b3d4; background:#4a1633; border:1px solid #81335f; border-radius:99px; padding:3px 7px; margin-right:6px; font-size:10px; font-weight:700; letter-spacing:.04em; }
 </style>
 </head>
 <body>
@@ -27,10 +40,16 @@
   <button id="add-stage">+ Stage / screen</button>
   <button id="add-buffet">+ Buffet table</button>
   <button id="add-booth">+ Photo booth</button>
+  <button id="open-tour">Open photo walkthrough</button>
   <button id="del-sel" class="danger">Delete selected</button>
   <button id="reset">Reset furniture (everyone)</button>
   <div id="summary">0 round tables &middot; 0 seats</div>
   <div id="hint">Drag empty floor to orbit &middot; drag a piece to move it &middot; scroll to zoom &middot; click a piece to select, click a table again to cycle its theme. Changes sync to everyone with this link, live.</div>
+</div>
+<div id="tour" aria-label="Photo-based hall walkthrough">
+  <div id="tour-head"><div><h2>Camp Nova Hall Walkthrough</h2><p><span id="tour-pill">PHOTO TOUR</span>Real hall frames · Drag, use arrow keys, or the timeline to move through the room.</p></div><button id="tour-close">Return to planner</button></div>
+  <div id="tour-stage"><img id="tour-image" alt="Hall walkthrough frame"><div id="tour-caption"></div></div>
+  <div id="tour-controls"><button class="tour-nav" id="tour-prev" aria-label="Previous view">‹</button><input id="tour-range" type="range" min="0" max="73" value="0" aria-label="Walkthrough progress"><div><button class="tour-nav" id="tour-next" aria-label="Next view">›</button><div id="tour-count"></div></div></div>
 </div>
 <div id="dims">Room estimate: 18m x 9m (59ft x 30ft) - edit ROOM_L / ROOM_W in this file once you have real measurements</div>
 <div id="status"><span class="dot"></span><span id="status-text">Connecting...</span></div>
@@ -512,6 +531,42 @@ window.addEventListener('pointerup', () => {
   dragging = null;
   controls.enabled = true;
 });
+
+// The walkthrough is intentionally a photo sequence, not an inferred 3D scan.
+// It preserves the real hall appearance while the planner remains the editable view.
+const tour = document.getElementById('tour');
+const tourImage = document.getElementById('tour-image');
+const tourRange = document.getElementById('tour-range');
+const tourCaption = document.getElementById('tour-caption');
+const tourCount = document.getElementById('tour-count');
+let tourFrame = 0, tourDragX = null;
+function frameSrc(i){ return 'tour/sf2/frame_' + String(i).padStart(3,'0') + '.jpg'; }
+function tourLocation(i){
+  if(i < 8) return 'East wall · double doors and credenza';
+  if(i < 18) return 'Stage end · projection wall and room corner';
+  if(i < 32) return 'North side · exits, columns, and main floor';
+  if(i < 47) return 'Centre aisle · full room view';
+  if(i < 62) return 'South side · doors and built-in credenza';
+  return 'West wall · service area and open event floor';
+}
+function setTourFrame(next){
+  tourFrame = Math.max(0,Math.min(73,Math.round(next)));
+  tourImage.style.opacity = '.25';
+  const src=frameSrc(tourFrame); tourImage.src=src;
+  tourImage.onload=()=>{tourImage.style.opacity='1';};
+  tourRange.value=tourFrame; tourCount.textContent=(tourFrame+1)+' / 74';
+  tourCaption.textContent=tourLocation(tourFrame);
+}
+function changeTour(amount){ setTourFrame(tourFrame+amount); }
+document.getElementById('open-tour').onclick=()=>{ tour.classList.add('open'); setTourFrame(tourFrame); };
+document.getElementById('tour-close').onclick=()=>tour.classList.remove('open');
+document.getElementById('tour-prev').onclick=()=>changeTour(-1);
+document.getElementById('tour-next').onclick=()=>changeTour(1);
+tourRange.oninput=e=>setTourFrame(e.target.value);
+document.getElementById('tour-stage').addEventListener('pointerdown',e=>{tourDragX=e.clientX; e.currentTarget.classList.add('dragging');});
+window.addEventListener('pointermove',e=>{if(tourDragX===null)return; const steps=Math.trunc((tourDragX-e.clientX)/18);if(steps){changeTour(steps);tourDragX=e.clientX;}});
+window.addEventListener('pointerup',()=>{tourDragX=null;document.getElementById('tour-stage').classList.remove('dragging');});
+window.addEventListener('keydown',e=>{if(!tour.classList.contains('open'))return;if(e.key==='ArrowRight')changeTour(1);if(e.key==='ArrowLeft')changeTour(-1);if(e.key==='Escape')tour.classList.remove('open');});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth/window.innerHeight;
