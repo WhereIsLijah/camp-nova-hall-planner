@@ -212,15 +212,19 @@ for(let x=-7.5;x<=7.5;x+=.16) box(.08,.012,.23,x,TRAY_H-.31,-.15,0x24211e);
   box(0.75, WALL_H, 0.55, cx, WALL_H/2, -hz+0.30, COL.column);
 });
 
-function doubleDoor(cx){
+function doubleDoor(cx, labelText){
   const z = -hz + 0.10;
   box(2.30, 2.35, 0.10, cx, 1.175, z+0.02, COL.doorFrame);
   box(1.02, 2.15, 0.08, cx-0.53, 1.075, z+0.06, COL.door);
   box(1.02, 2.15, 0.08, cx+0.53, 1.075, z+0.06, COL.door);
+  const label=makeLabelSprite(labelText,0x56485d); label.position.set(cx,2.56,z+.20); label.scale.set(.98,.37,1); scene.add(label);
 }
-[-2.6, 3.2, 7.9].forEach(doubleDoor);
-function sideDoor(cx, cz, rot=0){ const g=new THREE.Group(); const frame=box(1.35,2.35,.13,0,1.175,0,COL.doorFrame,g); const door=box(1.13,2.14,.08,0,1.07,.04,COL.door,g); box(1.02,.06,.055,0,1.12,.095,0x544b42,g); box(.08,.09,.05,.38,1.12,.13,0xd3a328,g); const sign=box(.54,.18,.06,0,2.48,.04,0xc7352d,g); sign.material.emissive=new THREE.Color(0x8c1e1e); sign.material.emissiveIntensity=.7; g.position.set(cx,0,cz); g.rotation.y=rot; scene.add(g); }
-sideDoor(-hx+.08,-2.7,Math.PI/2); sideDoor(-hx+.08,2.8,Math.PI/2); sideDoor(hx-.08,-1.7,-Math.PI/2); sideDoor(hx-.08,2.6,-Math.PI/2);
+[[ -2.6,'Main doors' ],[ 3.2,'Service doors' ],[ 7.9,'Exit' ]].forEach(([x,label])=>doubleDoor(x,label));
+function sideDoor(cx, cz, rot=0, labelText='Exit'){
+  const g=new THREE.Group(); const frame=box(1.35,2.35,.13,0,1.175,0,COL.doorFrame,g); const door=box(1.13,2.14,.08,0,1.07,.04,COL.door,g); box(1.02,.06,.055,0,1.12,.095,0x544b42,g); box(.08,.09,.05,.38,1.12,.13,0xd3a328,g); const sign=box(.54,.18,.06,0,2.48,.04,0xc7352d,g); sign.material.emissive=new THREE.Color(0x8c1e1e); sign.material.emissiveIntensity=.7;
+  const label=makeLabelSprite(labelText,0x56485d);label.position.set(0,2.68,.12);label.scale.set(.78,.3,1);g.add(label);g.position.set(cx,0,cz);g.rotation.y=rot;scene.add(g);
+}
+sideDoor(-hx+.08,-2.7,Math.PI/2,'Exit'); sideDoor(-hx+.08,2.8,Math.PI/2,'Service exit'); sideDoor(hx-.08,-1.7,-Math.PI/2,'Emergency exit'); sideDoor(hx-.08,2.6,-Math.PI/2,'Storage');
 
 box(4.60, 0.90, 0.55, 4.0, 0.45, hz-0.30, COL.credenza);
 box(0.08, 0.22, 3.30, -hx+0.14, 2.62, 0, COL.screenHousing);
