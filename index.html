@@ -4,17 +4,17 @@
 <meta charset="UTF-8">
 <title>Camp Nova - Hall 3D Planner</title>
 <style>
-  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#15151a; font-family: -apple-system, Helvetica, Arial, sans-serif; }
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#111116; font-family: Inter, ui-sans-serif, -apple-system, Helvetica, Arial, sans-serif; }
   #app { position:absolute; inset:0; }
-  #ui { position:absolute; top:14px; left:14px; z-index:10; background:rgba(20,20,24,0.85); border:1px solid #333; border-radius:10px; padding:12px 14px; color:#eee; max-width:260px; }
-  #ui h1 { font-size:14px; margin:0 0 8px; font-weight:600; }
-  #ui button { display:block; width:100%; margin:4px 0; padding:7px 10px; font-size:12.5px; background:#26262e; color:#eee; border:1px solid #3a3a44; border-radius:6px; cursor:pointer; text-align:left; }
-  #ui button:hover { background:#32323c; }
+  #ui { position:absolute; top:18px; left:18px; z-index:10; background:rgba(16,16,22,.82); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.16); border-radius:14px; padding:14px; color:#f6f2f4; max-width:242px; box-shadow:0 12px 42px rgba(0,0,0,.28); }
+  #ui h1 { font-size:15px; margin:0 0 10px; font-weight:650; letter-spacing:.01em; }
+  #ui button { display:block; width:100%; margin:5px 0; padding:8px 10px; font-size:12px; background:rgba(255,255,255,.07); color:#f7f3f5; border:1px solid rgba(255,255,255,.13); border-radius:7px; cursor:pointer; text-align:left; transition:.16s ease; }
+  #ui button:hover { background:rgba(214,104,166,.22); border-color:rgba(235,156,201,.55); transform:translateY(-1px); }
   #ui .danger { border-color:#7a3333; color:#f2b8b8; }
   #summary { font-size:12px; color:#bbb; margin-top:8px; line-height:1.5; }
   #hint { font-size:11px; color:#888; margin-top:8px; line-height:1.5; border-top:1px solid #333; padding-top:8px; }
   #dims { position:absolute; bottom:14px; left:14px; z-index:10; font-size:11px; color:#888; background:rgba(20,20,24,0.75); padding:6px 10px; border-radius:6px; }
-  #status { position:absolute; top:14px; right:14px; z-index:10; font-size:12px; color:#ddd; background:rgba(20,20,24,0.85); border:1px solid #333; padding:8px 12px; border-radius:8px; display:flex; align-items:center; gap:7px; }
+  #status { position:absolute; top:18px; right:18px; z-index:10; font-size:12px; color:#eee; background:rgba(16,16,22,.82); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.16); padding:8px 12px; border-radius:999px; display:flex; align-items:center; gap:7px; }
   #status .dot { width:8px; height:8px; border-radius:50%; background:#e0a83a; }
   #status.live .dot { background:#3adb76; }
   #tour { position:fixed; inset:0; z-index:30; display:none; background:#09090c; color:#fff; }
@@ -58,6 +58,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyDUCawGckO7HWDku_SA6vca6aktI6uWx9Q",
@@ -111,11 +112,13 @@ const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHei
 
 const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.12;
+renderer.physicallyCorrectLights = false;
 document.getElementById('app').appendChild(renderer.domElement);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -140,11 +143,9 @@ function confineCamera(){
 }
 controls.addEventListener('change', confineCamera);
 
-scene.add(new THREE.HemisphereLight(0xfff3dd, 0x3a3226, 1.05));
-const dir = new THREE.DirectionalLight(0xfff3dd, 0.7);
-dir.position.set(8, 12, 6);
-dir.castShadow = true;
-scene.add(dir);
+scene.add(new THREE.HemisphereLight(0xfff1db, 0x3a302a, 1.18));
+const key = new THREE.DirectionalLight(0xffefd3, .92); key.position.set(2,8,3); key.castShadow=true; key.shadow.mapSize.set(2048,2048); key.shadow.camera.left=-11;key.shadow.camera.right=11;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
+for(const [x,z] of [[-6,-2.4],[-2,2.2],[2,-2.1],[6,2.1]]){const spot=new THREE.SpotLight(0xffe5c4,.65,8,Math.PI/4,.55,1.4);spot.position.set(x,3.12,z);spot.target.position.set(x,0,z);spot.castShadow=true;spot.shadow.mapSize.set(1024,1024);scene.add(spot,spot.target);}
 
 function box(sx, sy, sz, cx, cy, cz, color, parent, material) {
   const geo = new THREE.BoxGeometry(sx, sy, sz);
@@ -155,17 +156,20 @@ function box(sx, sy, sz, cx, cy, cz, color, parent, material) {
   (parent || scene).add(m);
   return m;
 }
+function roundedBox(sx,sy,sz,r,cx,cy,cz,material,parent){
+  const m=new THREE.Mesh(new THREE.RoundedBoxGeometry(sx,sy,sz,4,r),material);m.position.set(cx,cy,cz);m.castShadow=m.receiveShadow=true;(parent||scene).add(m);return m;
+}
 
 function proceduralTexture(draw, size=512, repeatX=1, repeatY=1){
   const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); draw(x,size);
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(repeatX,repeatY); t.encoding=THREE.sRGBEncoding; return t;
 }
 const carpetMap=proceduralTexture((x,s)=>{x.fillStyle='#a57a34';x.fillRect(0,0,s,s);for(let i=0;i<15000;i++){const a=Math.random()*0.18+0.04;x.fillStyle=`rgba(${70+Math.random()*60},${45+Math.random()*35},${18},${a})`;x.fillRect(Math.random()*s,Math.random()*s,1+Math.random()*2,1+Math.random()*2)} for(let y=0;y<s;y+=16){x.fillStyle='rgba(255,220,140,.06)';x.fillRect(0,y,s,1)}},512,10,5);
-const carpetMat=new THREE.MeshStandardMaterial({map:carpetMap,color:0xd0a657,roughness:1});
+const carpetMat=new THREE.MeshStandardMaterial({map:carpetMap,color:0xffffff,roughness:1});
 const wallMap=proceduralTexture((x,s)=>{x.fillStyle='#735541';x.fillRect(0,0,s,s);for(let i=0;i<28000;i++){x.fillStyle=`rgba(255,240,220,${Math.random()*.06})`;x.fillRect(Math.random()*s,Math.random()*s,1,1)}},512,5,2);
-const wallMat=new THREE.MeshStandardMaterial({map:wallMap,color:0xb79578,roughness:.93});
-const whiteMat=new THREE.MeshStandardMaterial({color:0xf6f3ec,roughness:.8});
-const metalMat=new THREE.MeshStandardMaterial({color:0x9b9290,roughness:.28,metalness:.72});
+const wallMat=new THREE.MeshStandardMaterial({map:wallMap,color:0xffffff,roughness:.9});
+const whiteMat=new THREE.MeshStandardMaterial({color:0xf5f1ea,roughness:.72});
+const metalMat=new THREE.MeshStandardMaterial({color:0xb7ada6,roughness:.2,metalness:.88});
 
 box(ROOM_L, 0.05, ROOM_W, 0, -0.025, 0, COL.carpet, null, carpetMat);
 
@@ -200,9 +204,9 @@ coveBar(0.10, 0.16, innerW, -innerL/2, coveY, 0);
 coveBar(0.10, 0.16, innerW,  innerL/2, coveY, 0);
 
 // Acoustic ceiling tiles, fluorescent panels, recessed cans, and the long HVAC soffit.
-const tileMat=new THREE.MeshStandardMaterial({color:0xd6cab9,roughness:.95});
+const tileMat=new THREE.MeshStandardMaterial({color:0xcfc2b0,roughness:.96});
 for(let x=-7.5;x<=7.5;x+=1.5) for(let z=-3.25;z<=3.25;z+=1.25) box(1.46,.025,1.21,x,TRAY_H-.04,z,0,null,tileMat);
-const lightMat=new THREE.MeshStandardMaterial({color:0xfff8e8,emissive:0xfff1c9,emissiveIntensity:.75,roughness:.55});
+const lightMat=new THREE.MeshStandardMaterial({color:0xf4ead7,emissive:0xffe9bc,emissiveIntensity:.42,roughness:.6});
 for(let x=-6.6;x<=6.6;x+=3.3) for(let z=-2.45;z<=2.45;z+=2.45) box(1.18,.035,.55,x,TRAY_H-.07,z,0,null,lightMat);
 for(let x=-7.4;x<=7.4;x+=1.85){ const lamp=new THREE.PointLight(0xffe4b3,.24,5); lamp.position.set(x,2.83,-hz+.62); scene.add(lamp); }
 box(ROOM_L-.6,.15,.34,0,TRAY_H-.22,-.15,0x786f62);
@@ -241,18 +245,31 @@ const themes = [
 ];
 
 function makeLabelSprite(text, bg){
-  const c = document.createElement('canvas'); c.width=256; c.height=96;
+  const c = document.createElement('canvas'); c.width=512; c.height=128;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#'+bg.toString(16).padStart(6,'0'); ctx.fillRect(0,0,256,96);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 40px sans-serif';
+  ctx.fillStyle = '#'+bg.toString(16).padStart(6,'0'); ctx.fillRect(0,0,512,128);
+  ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=4;ctx.strokeRect(5,5,502,118);
+  ctx.fillStyle = '#fff'; ctx.font = '600 45px Arial';
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(text, 128, 48);
+  ctx.fillText(text.toUpperCase(), 256, 64);
   const tex = new THREE.CanvasTexture(c);
-  const mat = new THREE.SpriteMaterial({map:tex});
-  const spr = new THREE.Sprite(mat);
-  spr.scale.set(1.1, 0.42, 1);
-  return spr;
+  tex.encoding=THREE.sRGBEncoding;
+  const mat = new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide});
+  const plaque = new THREE.Mesh(new THREE.PlaneGeometry(1.15,.29),mat);
+  return plaque;
 }
+
+function brandPanelTexture(){
+  const c=document.createElement('canvas');c.width=1024;c.height=620;const x=c.getContext('2d');
+  x.fillStyle='#f6eff4';x.fillRect(0,0,c.width,c.height);
+  for(let i=0;i<115;i++){const s=10+(i%5)*5;x.fillStyle=i%2?'#d978b5':'#9d70c4';x.globalAlpha=.35;x.fillRect((i*71)%c.width,(i*37)%c.height,s,s);}x.globalAlpha=1;
+  x.fillStyle='#3b285d';x.font='600 42px Arial';x.textAlign='center';x.fillText('PROJECTGENOVA',512,120);
+  x.fillStyle='#cf5f9c';x.font='700 92px Arial';x.fillText('CAMP NOVA',512,280);
+  x.fillStyle='#3b285d';x.font='600 34px Arial';x.fillText('BUILD. CREATE. INNOVATE.',512,350);
+  x.fillStyle='#3b285d';x.font='32px Arial';x.fillText('</>',512,435);
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;
+}
+const brandScreenMat=new THREE.MeshStandardMaterial({map:brandPanelTexture(),emissive:0x33223e,emissiveIntensity:.13,roughness:.58});
 
 function addBalloon(parent, x,y,z,r,color){
   const b=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),new THREE.MeshStandardMaterial({color,roughness:.3,metalness:color===0xc9c9c9?.55:0}));
@@ -262,8 +279,9 @@ function addBanquetChair(parent,x,z,a=0){
   const g=new THREE.Group();
   const upholstery=new THREE.MeshStandardMaterial({color:0x141822,roughness:.8});
   const frameMat=new THREE.MeshStandardMaterial({color:0x111218,metalness:.64,roughness:.3});
-  const seat=new THREE.Mesh(new THREE.BoxGeometry(.46,.09,.46),upholstery); seat.position.y=.48; g.add(seat);
-  const back=new THREE.Mesh(new THREE.BoxGeometry(.43,.52,.075),upholstery); back.position.set(0,.79,.16); back.rotation.x=-.12; g.add(back);
+  const seat=roundedBox(.48,.11,.48,.045,0,.48,0,upholstery,g);
+  const back=roundedBox(.45,.54,.085,.05,0,.79,.16,upholstery,g); back.rotation.x=-.12;
+  const inset=roundedBox(.34,.39,.022,.018,0,.8,.213,new THREE.MeshStandardMaterial({color:0x202633,roughness:.65}),g);inset.rotation.x=-.12;
   for(const [lx,lz] of [[-.18,-.18],[.18,-.18],[-.18,.18],[.18,.18]]){ const leg=new THREE.Mesh(new THREE.CylinderGeometry(.022,.018,.5,7),frameMat); leg.position.set(lx,.25,lz); g.add(leg); }
   g.position.set(x,0,z);g.rotation.y=a; parent.add(g);
 }
@@ -296,21 +314,16 @@ function buildFurniture(type, data){
     }
 
     for(let i=0;i<5;i++) addBalloon(g,Math.cos(i*1.26)*.2, .91+((i%2)*.12), Math.sin(i*1.26)*.2,.11,[0xd85a8e,0x7141a2,0x1d1b26,0xc9c9c9,theme.color][i]);
-    const label = makeLabelSprite(theme.name, theme.color);
-    label.position.set(0, 1.45, 0);
-    g.add(label);
-    g.userData.label = label;
+    g.userData.label = null;
 
   } else if(type === 'stage'){
     g.userData.half = 1.4; g.userData.h = 0;
     const deck=box(2.7,.24,3.7,0,.12,0,0x32233b,g);
-    const screen = new THREE.Mesh(new THREE.BoxGeometry(.08,1.72,2.72),whiteMat);screen.position.set(0,1.2,0);screen.rotation.y=Math.PI/2;screen.castShadow=true;g.add(screen);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(.08,1.72,2.72),brandScreenMat);screen.position.set(0,1.2,0);screen.rotation.y=Math.PI/2;screen.castShadow=true;g.add(screen);
     const frame=box(.13,1.9,2.92,0,1.22,0,0x15131b,g); frame.rotation.y=Math.PI/2;
     const podium=box(.58,1.03,.46,.82,.52,1.2,0x514a52,g); box(.62,.07,.5,.82,1.05,1.2,0xd6abc4,g);
     const mic=new THREE.Mesh(new THREE.CylinderGeometry(.014,.014,.5,8),metalMat);mic.position.set(.82,1.4,1.2);mic.rotation.z=.42;g.add(mic);
     [-1.35,1.35].forEach((zz)=>{for(let i=0;i<9;i++) addBalloon(g,.78+(i%3)*.1,.2+Math.floor(i/3)*.34,zz+(i%2?.13:-.1),.17,[0xd85a8e,0x7141a2,0x1c1821,0xc9c9c9][i%4]);});
-    const label = makeLabelSprite('Stage', 0x534ab7);
-    label.position.set(0.5, 2.3, 0); g.add(label);
 
   } else if(type === 'buffet'){
     g.userData.half = 1.3; g.userData.h = 0;
@@ -322,8 +335,6 @@ function buildFurniture(type, data){
       chafer.position.set(-0.9+i*0.9, 0.9, 0); g.add(chafer);
     }
     for(let i=0;i<4;i++){const plate=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.025,20),whiteMat);plate.position.set(-.88+i*.58,.93,.15);g.add(plate);}
-    const label = makeLabelSprite('Buffet', 0xba7517);
-    label.position.set(0, 1.5, 0); g.add(label);
 
   } else if(type === 'booth'){
     g.userData.half = 1.1; g.userData.h = 0;
@@ -335,8 +346,6 @@ function buildFurniture(type, data){
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.25,1.5,0.25),whiteMat);
     post.position.set(1.0, 0.75, 0); g.add(post);
     const cameraBody=new THREE.Mesh(new THREE.BoxGeometry(.25,.4,.16),new THREE.MeshStandardMaterial({color:0x11111a,metalness:.35,roughness:.32}));cameraBody.position.set(1,1.42,0);g.add(cameraBody);
-    const label = makeLabelSprite('Photo booth', 0xa32d2d);
-    label.position.set(0.5, 2.5, 0); g.add(label);
   }
 
   g.position.set(data.x || 0, 0, data.z || 0);
@@ -358,12 +367,6 @@ function updateSummary(){
 
 function cycleThemeLocal(g){
   g.userData.themeIdx = (g.userData.themeIdx + 1) % themes.length;
-  const theme = themes[g.userData.themeIdx];
-  g.remove(g.userData.label);
-  const label = makeLabelSprite(theme.name, theme.color);
-  label.position.set(0, 1.35, 0);
-  g.add(label);
-  g.userData.label = label;
 }
 
 furnitureRef.on('child_added', (snap) => {
@@ -389,12 +392,6 @@ furnitureRef.on('child_changed', (snap) => {
   if(selected === g) selectFurniture(g);
   if(data.type === 'round' && (data.themeIdx || 0) !== g.userData.themeIdx){
     g.userData.themeIdx = data.themeIdx || 0;
-    const theme = themes[g.userData.themeIdx % themes.length];
-    g.remove(g.userData.label);
-    const label = makeLabelSprite(theme.name, theme.color);
-    label.position.set(0, 1.35, 0);
-    g.add(label);
-    g.userData.label = label;
   }
 });
 
@@ -420,9 +417,9 @@ function seedDefaultLayout(){
   });
 }
 
-db.ref('meta/seeded').transaction((cur) => {
-  if(cur === true) return;
-  return true;
+db.ref('meta/architecturalLayoutVersion').transaction((cur) => {
+  if(cur === 1) return;
+  return 1;
 }).then((result) => {
   if(result.committed){
     furnitureRef.once('value').then((snap) => {
